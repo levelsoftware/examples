@@ -1,6 +1,6 @@
 #################################################
 #
-# Paste your Level installer command at "## PASTE LEVEL INSTALL STRING BELOW ##""
+# Paste your Level installer command at "## PASTE LEVEL INSTALL STRING BELOW ##"
 # This script checks that the target machine is a Windows Domain Controller, and then 
 # creates a GPO backup file on the system drive at \temp\Level-Temp\.  A new GPO called
 # "Install Level Agent" is created and linked at the root of the domain.  The contents
