@@ -1,6 +1,6 @@
 #################################################
 #
-# Paste your Level installer command at "## PASTE LEVEL INSTALL STRING BELOW ##""
+# Paste your Level installer command at "## PASTE LEVEL INSTALL STRING BELOW ##"
 # This script checks that the target machine is a Windows Domain Controller, and then 
 # creates a GPO backup file on the system drive at \temp\Level-Temp\.  A new GPO called
 # "Install Level Agent" is created and linked at the root of the domain.  The contents
@@ -29,7 +29,7 @@ New-EventLog -LogName Application -Source "Level"
 if($service -eq $null) {
     # Level is not installed. Paste your install script from the Level app below so it can be installed
     ########### PASTE LEVEL INSTALL STRING BELOW ##############
-$env:LEVEL_API_KEY = "fuARsf8hj6xTgEHctGSJzW4a:417"; Set-ExecutionPolicy RemoteSigned -Scope Process -Force; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; iwr -useb https://downloads.level.io/install_windows.ps1 | iex    
+Paste Level install command here
     ########### PASTE LEVEL INSTALL STRING ABOVE ##############
 
     Write-EventLog -LogName "Application" -Source "Level" -EventID 100 -EntryType Information -Message "Level was successfully installed.  Please check the agent page at https://app.level.io and look for the agent called $hostname"
@@ -63,16 +63,17 @@ $env:LEVEL_API_KEY = "fuARsf8hj6xTgEHctGSJzW4a:417"; Set-ExecutionPolicy RemoteS
 '@
 
 # Create PSscripts.ini
-    $PSscripts_ini_path = $env:systemdrive + '\temp\Level-Temp\{6FCFE453-2E93-48CE-825A-A3EF59ABA1B2}\DomainSysvol\GPO\Machine\Scripts\PSscripts.ini'
-    Set-Content $PSscripts_ini_path @'
+$DomainName = Get-ADDomain | Select-Object -ExpandProperty Forest
+$PSscripts_ini_path = $env:systemdrive + '\temp\Level-Temp\{6FCFE453-2E93-48CE-825A-A3EF59ABA1B2}\DomainSysvol\GPO\Machine\Scripts\PSscripts.ini'
+    Set-Content $PSscripts_ini_path @"
 
 [Startup]
-0CmdLine=\\level.local\SysVol\level.local\scripts\Install_Level_Agent.ps1
+0CmdLine=\\$DomainName\SysVol\$DomainName\scripts\Install_Level_Agent.ps1
 0Parameters=Set-ExecutionPolicy Bypass
 [Shutdown]
-0CmdLine=\\level.local\SysVol\level.local\scripts\Install_Level_Agent.ps1
+0CmdLine=\\$DomainName\SysVol\$DomainName\scripts\Install_Level_Agent.ps1
 0Parameters=Set-ExecutionPolicy Bypass
-'@
+"@
 
 # Create a new GPO "Install Level Agent" and link it to the root of the domain
 $DistinguishedName = Get-ADDomain | Select-Object -ExpandProperty DistinguishedName
