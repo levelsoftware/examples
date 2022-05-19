@@ -5,8 +5,9 @@
 # creates a GPO backup file on the system drive at \temp\Level-Temp\.  A new GPO called
 # "Install Level Agent" is created and linked at the root of the domain.  The contents
 # of the GPO backup are imported into the new object, and the contents of the backup 
-# is a single script that will run on all domain-joined computers at logon and logoff.
-# If Level is not installed, the Level install command will be run. 
+# is a scheduled task that calls Install_Level_Agent.ps1 from the SYSVOL script share.
+# The scheduled task will check if Level is installed, and if not the Level install 
+# command will be run. 
 #
 # This script should only be run once on a single domain controller per Active 
 # Directory environment!
@@ -19,7 +20,7 @@ if($null -eq $service)
 {
     Write-Error "This computer is not a domain controller.  Please run this script on a domain controller."
 } else {
-# Create the Level logon script in "\SYSVOL\domain\scripts\Install_Level_Agent.ps1"
+# Create the Level logon script in \SYSVOL\domain\scripts\Install_Level_Agent.ps1
 $Net_Share_Path = $env:systemroot + '\SYSVOL\domain\scripts\Install_Level_Agent.ps1'
 Set-Content $Net_Share_Path @'
 # Check if the Level service is already present 
@@ -40,39 +41,84 @@ Paste Level install command here
 '@
 
 # Create the group policy backup folders and files prior to importing 
-    $GPO_path = $env:systemdrive + '\temp\Level-Temp\{6FCFE453-2E93-48CE-825A-A3EF59ABA1B2}\DomainSysvol\GPO\Machine\Scripts'
+    $GPO_path = $env:systemdrive + '\temp\Level-Temp\{920B8A43-A054-4C44-B126-1E057DFFBC4C}\DomainSysvol\GPO\Machine\Preferences\ScheduledTasks'
     New-Item $GPO_path -ItemType Directory
     
 # Create Backup.xml
-    $Backup_xml_path = $env:systemdrive + '\temp\Level-Temp\{6FCFE453-2E93-48CE-825A-A3EF59ABA1B2}\Backup.xml'
-    Set-Content $Backup_xml_path @'
+    $DomainName = Get-ADDomain | Select-Object -ExpandProperty Forest
+    $Backup_xml_path = $env:systemdrive + '\temp\Level-Temp\{920B8A43-A054-4C44-B126-1E057DFFBC4C}\Backup.xml'
+    Set-Content $Backup_xml_path @"
 <?xml version="1.0" encoding="utf-8"?>
 <GroupPolicyBackupScheme bkp:version="2.0" bkp:type="GroupPolicyBackupTemplate" xmlns:bkp="http://www.microsoft.com/GroupPolicy/GPOOperations" xmlns="http://www.microsoft.com/GroupPolicy/GPOOperations">
-    <GroupPolicyObject><FilePaths/><GroupPolicyCoreSettings><ID><![CDATA[{1041B92A-930A-46F9-8942-CA7AB9080D33}]]></ID><Domain></Domain><SecurityDescriptor></SecurityDescriptor><DisplayName><![CDATA[Install Level Agent]]></DisplayName><Options></Options><UserVersionNumber></UserVersionNumber><MachineVersionNumber></MachineVersionNumber><MachineExtensionGuids><![CDATA[[{42B5FAAE-6536-11D2-AE5A-0000F87571E3}{40B6664F-4972-11D1-A7CA-0000F87571E3}]]]></MachineExtensionGuids><UserExtensionGuids/><WMIFilter/></GroupPolicyCoreSettings>
-        <GroupPolicyExtension bkp:ID="{42B5FAAE-6536-11d2-AE5A-0000F87571E3}" bkp:DescName="Scripts">
-            <FSObjectFile bkp:Path="%GPO_MACH_FSPATH%\Scripts\PSscripts.ini" bkp:Location="DomainSysvol\GPO\Machine\Scripts\PSscripts.ini"/>
-        </GroupPolicyExtension>
+<GroupPolicyObject><FilePaths/><GroupPolicyCoreSettings><ID><![CDATA[{ADF3CB7A-D977-4F44-9D77-DCAC28426AC2}]]></ID><Domain></Domain><SecurityDescriptor></SecurityDescriptor><DisplayName><![CDATA[Level Install - Task]]></DisplayName><Options><![CDATA[0]]></Options><UserVersionNumber><![CDATA[0]]></UserVersionNumber><MachineVersionNumber><![CDATA[1835036]]></MachineVersionNumber><MachineExtensionGuids><![CDATA[[{00000000-0000-0000-0000-000000000000}{CAB54552-DEEA-4691-817E-ED4A4D1AFC72}][{AADCED64-746C-4633-A97C-D61349046527}{CAB54552-DEEA-4691-817E-ED4A4D1AFC72}]]]></MachineExtensionGuids><UserExtensionGuids/><WMIFilter/></GroupPolicyCoreSettings> 
+    <GroupPolicyExtension bkp:ID="{F15C46CD-82A0-4C2D-A210-5D0D3182A418}" bkp:DescName="Unknown Extension">
+	<FSObjectFile bkp:Path="%GPO_MACH_FSPATH%\Preferences\ScheduledTasks\ScheduledTasks.xml" bkp:Location="DomainSysvol\GPO\Machine\Preferences\ScheduledTasks\ScheduledTasks.xml"/>
+	</GroupPolicyExtension>
     </GroupPolicyObject>
 </GroupPolicyBackupScheme>
-'@
+"@
 
 # Create bkupInfo.xml
-    $bkupInfo_xml_path = $env:systemdrive + '\temp\Level-Temp\{6FCFE453-2E93-48CE-825A-A3EF59ABA1B2}\bkupInfo.xml'
+    $bkupInfo_xml_path = $env:systemdrive + '\temp\Level-Temp\{920B8A43-A054-4C44-B126-1E057DFFBC4C}\bkupInfo.xml'
     Set-Content $bkupInfo_xml_path @'
-    <BackupInst xmlns="http://www.microsoft.com/GroupPolicy/GPOOperations/Manifest"><GPOGuid><![CDATA[{1041B92A-930A-46F9-8942-CA7AB9080D33}]]></GPOGuid><GPODomain><![CDATA[level.local]]></GPODomain><GPODomainGuid><![CDATA[{5ce50db9-5895-43f4-ab58-fb8f5811a29b}]]></GPODomainGuid><GPODomainController><![CDATA[Server.level.local]]></GPODomainController><BackupTime><![CDATA[2022-05-14T21:28:22]]></BackupTime><ID><![CDATA[{6FCFE453-2E93-48CE-825A-A3EF59ABA1B2}]]></ID><Comment><![CDATA[]]></Comment><GPODisplayName><![CDATA[Install Level Agent]]></GPODisplayName></BackupInst>
+    <BackupInst xmlns="http://www.microsoft.com/GroupPolicy/GPOOperations/Manifest"><GPOGuid><![CDATA[{1041B92A-930A-46F9-8942-CA7AB9080D33}]]></GPOGuid><GPODomain><![CDATA[level.local]]></GPODomain><GPODomainGuid><![CDATA[{5ce50db9-5895-43f4-ab58-fb8f5811a29b}]]></GPODomainGuid><GPODomainController><![CDATA[Server.level.local]]></GPODomainController><BackupTime><![CDATA[2022-05-14T21:28:22]]></BackupTime><ID><![CDATA[{920B8A43-A054-4C44-B126-1E057DFFBC4C}]]></ID><Comment><![CDATA[]]></Comment><GPODisplayName><![CDATA[Install Level Agent]]></GPODisplayName></BackupInst>
 '@
 
-# Create PSscripts.ini
-$DomainName = Get-ADDomain | Select-Object -ExpandProperty Forest
-$PSscripts_ini_path = $env:systemdrive + '\temp\Level-Temp\{6FCFE453-2E93-48CE-825A-A3EF59ABA1B2}\DomainSysvol\GPO\Machine\Scripts\PSscripts.ini'
-    Set-Content $PSscripts_ini_path @"
-
-[Startup]
-0CmdLine=\\$DomainName\SysVol\$DomainName\scripts\Install_Level_Agent.ps1
-0Parameters=Set-ExecutionPolicy Bypass
-[Shutdown]
-0CmdLine=\\$DomainName\SysVol\$DomainName\scripts\Install_Level_Agent.ps1
-0Parameters=Set-ExecutionPolicy Bypass
+# Create ScheduledTasks.xml
+$ScheduledTasks_xml_path = $env:systemdrive + '\temp\Level-Temp\{920B8A43-A054-4C44-B126-1E057DFFBC4C}\DomainSysvol\GPO\Machine\Preferences\ScheduledTasks\ScheduledTasks.xml'
+    Set-Content $ScheduledTasks_xml_path @"
+<?xml version="1.0" encoding="utf-8"?>
+<ScheduledTasks clsid="{CC63F200-7309-4ba0-B154-A71CD118DBCC}">
+    <ImmediateTaskV2 clsid="{9756B581-76EC-4169-9AFC-0CA8D43ADB5F}" name="Install Level Agent" image="0" changed="2022-05-18 04:29:29" uid="{F734F614-77C6-4DFA-B0B0-25D49EE2FE35}" userContext="0" removePolicy="0">
+        <Properties action="C" name="Install Level Agent" runAs="NT AUTHORITY\System" logonType="S4U">
+            <Task version="1.3">
+                <RegistrationInfo>
+                    <Author>LEVEL\Administrator</Author>
+                    <Description/>
+                </RegistrationInfo>
+                <Principals>
+                    <Principal id="Author">
+                        <UserId>NT AUTHORITY\System</UserId>
+                        <LogonType>S4U</LogonType>
+                        <RunLevel>HighestAvailable</RunLevel>
+                    </Principal>
+                </Principals>
+                <Settings>
+                    <IdleSettings>
+                        <Duration>PT5M</Duration>
+                        <WaitTimeout>PT1H</WaitTimeout>
+                        <StopOnIdleEnd>false</StopOnIdleEnd>
+                        <RestartOnIdle>false</RestartOnIdle>
+                    </IdleSettings>
+                    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+                    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+                    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+                    <AllowHardTerminate>true</AllowHardTerminate>
+                    <StartWhenAvailable>true</StartWhenAvailable>
+                    <AllowStartOnDemand>true</AllowStartOnDemand>
+                    <Enabled>true</Enabled>
+                    <Hidden>false</Hidden>
+                    <ExecutionTimeLimit>PT1H</ExecutionTimeLimit>
+                    <Priority>7</Priority>
+                    <DeleteExpiredTaskAfter>PT0S</DeleteExpiredTaskAfter>
+                </Settings>
+                <Triggers>
+                    <TimeTrigger>
+                        <StartBoundary>%LocalTimeXmlEx%</StartBoundary>
+                        <EndBoundary>%LocalTimeXmlEx%</EndBoundary>
+                        <Enabled>true</Enabled>
+                    </TimeTrigger>
+                </Triggers>
+                <Actions Context="Author">
+                    <Exec>
+                        <Command>C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe</Command>
+                        <Arguments>-ExecutionPolicy bypass -command "&amp; \\$DomainName\SYSVOL\$DomainName\scripts\Install_Level_Agent.ps1"</Arguments>
+                    </Exec>
+                </Actions>
+            </Task>
+        </Properties>
+    </ImmediateTaskV2>
+</ScheduledTasks>
 "@
 
 # Create a new GPO "Install Level Agent" and link it to the root of the domain
