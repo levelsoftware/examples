@@ -20,8 +20,9 @@ if($null -eq $service)
 {
     Write-Error "This computer is not a domain controller.  Please run this script on a domain controller."
 } else {
-# Create the Level logon script in \SYSVOL\domain\scripts\Install_Level_Agent.ps1
-$Net_Share_Path = $env:systemroot + '\SYSVOL\domain\scripts\Install_Level_Agent.ps1'
+# Create the Level logon script in the sysvol location + \domain\scripts\Install_Level_Agent.ps1
+$Sysvol_Location = Get-SMBShare -Name SYSVOL | Select-Object -ExpandProperty Path
+$Net_Share_Path = $Sysvol_Location + '\domain\scripts\Install_Level_Agent.ps1'
 Set-Content $Net_Share_Path @'
 # Check if the Level service is already present 
 $service = Get-Service -Name Level -ErrorAction SilentlyContinue
