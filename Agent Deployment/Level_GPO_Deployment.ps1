@@ -13,16 +13,16 @@
 # Directory environment!
 #
 #################################################
-
 # Check for Active Directory and halt if not present
 $service = Get-Service -Name ntds -ErrorAction SilentlyContinue
 if($null -eq $service)
 {
     Write-Error "This computer is not a domain controller.  Please run this script on a domain controller."
 } else {
-# Create the Level logon script in the sysvol location + \domain\scripts\Install_Level_Agent.ps1
+# Create the Level logon script in the sysvol location.  Find sysvol share, chop of trailing directory, append 'domain\scripts\'
 $Sysvol_Location = Get-SMBShare -Name SYSVOL | Select-Object -ExpandProperty Path
-$Net_Share_Path = $Sysvol_Location + '\domain\scripts\Install_Level_Agent.ps1'
+$Sysvol_Short = $Sysvol_Location -replace ".{6}$" 
+$Net_Share_Path = $Sysvol_Short + 'domain\scripts\Install_Level_Agent.ps1'
 Set-Content $Net_Share_Path @'
 # Check if the Level service is already present 
 $service = Get-Service -Name Level -ErrorAction SilentlyContinue
@@ -129,4 +129,7 @@ New-GPO -Name "Install Level Agent" | New-GPLink -Target $DistinguishedName
 # Import the GPO settings from the backup files (above) into the new GPO
 $GPO_Backup_Location = $env:systemdrive + '\temp\Level-Temp\'
 Import-GPO -BackupGpoName "Install Level Agent" -Path $GPO_Backup_Location -TargetName "Install Level Agent"
+
+#Clean up temp files
+Remove-Item -Recurse -Force $GPO_Backup_Location
 }
